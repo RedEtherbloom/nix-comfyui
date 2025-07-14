@@ -1,4 +1,4 @@
-{ autoPatchelfHook, basePython, ffmpeg_6, lib, sox, tbb_2021_11 }:
+{ autoPatchelfHook, basePython, ffmpeg_6, lib, sox, tbb_2021 }:
 
 final: prev:
 
@@ -95,7 +95,7 @@ in
   numba = lib.pipe prev.numba [
     (ops.addBuildInputs [
       # libtbb.so.12
-      tbb_2021_11
+      tbb_2021
     ])
   ];
 

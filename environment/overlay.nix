@@ -1,15 +1,21 @@
-{ autoPatchelfHook, basePython, ffmpeg_6, lib, sox, tbb_2021 }:
-
-final: prev:
-
-let
+{
+  autoPatchelfHook,
+  basePython,
+  ffmpeg_6,
+  lib,
+  sox,
+  tbb_2021,
+}: final: prev: let
   ops = import ./ops.nix;
 
   inherit (final.python) sitePackages;
 
   bootstrappingBase = basePython.pythonOnBuildForHost.pkgs;
 
-  mkFailingPackage = { pname, message }:
+  mkFailingPackage = {
+    pname,
+    message,
+  }:
     final.buildPythonPackage {
       inherit pname;
       version = "0.0.0";
@@ -21,25 +27,23 @@ let
 
   replaceOpenCV = package:
     package.overridePythonAttrs (old: {
-      propagatedBuildInputs =
-        let
-          originalInputs = old.propagatedBuildInputs;
-          filteredInputs = (builtins.filter
-            (x: !(builtins.elem x.pname [
+      propagatedBuildInputs = let
+        originalInputs = old.propagatedBuildInputs;
+        filteredInputs =
+          builtins.filter
+          (x:
+            !(builtins.elem x.pname [
               "opencv-contrib-python"
               "opencv-contrib-python-headless"
               "opencv-python-headless"
             ]))
-            originalInputs);
-        in
-        if builtins.length originalInputs == builtins.length filteredInputs then
-          throw "Package ${package.pname} does not depend on opencv-*"
-        else
-          filteredInputs ++ [ final.opencv-python ];
+          originalInputs;
+      in
+        if builtins.length originalInputs == builtins.length filteredInputs
+        then throw "Package ${package.pname} does not depend on opencv-*"
+        else filteredInputs ++ [final.opencv-python];
     });
-in
-
-{
+in {
   albucore = lib.pipe prev.albucore [
     replaceOpenCV
   ];
@@ -82,39 +86,36 @@ in
 
   # Add autoPatchelfHook to all packages.
   # https://github.com/nix-community/poetry2nix/issues/1589
-  mkPoetryDep = attrs:
-    let
-      originalPoetryDep = prev.mkPoetryDep attrs;
-    in
+  mkPoetryDep = attrs: let
+    originalPoetryDep = prev.mkPoetryDep attrs;
+  in
     originalPoetryDep.overridePythonAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
-        autoPatchelfHook
-      ];
+      nativeBuildInputs =
+        (old.nativeBuildInputs or [])
+        ++ [
+          autoPatchelfHook
+        ];
     });
-
-  numba = lib.pipe prev.numba [
-    (ops.addBuildInputs [
-      # libtbb.so.12
-      tbb_2021
-    ])
-  ];
+  inherit (bootstrappingBase) packaging tomli;
 
   opencv-contrib-python = mkFailingPackage {
     pname = "opencv-contrib-python";
     message = "Use opencv-python instead of opencv-contrib-python";
   };
-
   opencv-contrib-python-headless = mkFailingPackage {
     pname = "opencv-contrib-python-headless";
     message = "Use opencv-python instead of opencv-contrib-python-headless";
   };
-
   opencv-python-headless = mkFailingPackage {
     pname = "opencv-python-headless";
     message = "Use opencv-python instead of opencv-python-headless";
   };
 
-  inherit (bootstrappingBase) packaging;
+  numba = lib.pipe prev.numba [
+    (ops.addBuildInputs [
+      tbb_2021
+    ])
+  ];
 
   pixeloe = lib.pipe prev.pixeloe [
     (ops.addBuildInputs [
@@ -138,21 +139,14 @@ in
     ])
   ];
 
-  inherit (bootstrappingBase) tomli;
-
   torchaudio = lib.pipe prev.torchaudio [
     (ops.addBuildInputs [
-      # libavcodec.so.60
-      # libavdevice.so.60
-      # libavfilter.so.9
-      # libavformat.so.60
-      # libavutil.so.58
       ffmpeg_6
-
-      # libsox.so
       sox
     ])
-
+    (ops.addSearchPaths [
+      "${final.torch}/${sitePackages}/torch/lib"
+    ])
     (ops.ignoreMissingDeps [
       "libavcodec.so.58"
       "libavcodec.so.59"
@@ -165,22 +159,9 @@ in
       "libavutil.so.56"
       "libavutil.so.57"
     ])
-
-    (ops.addSearchPaths [
-      # libc10.so
-      # libtorch_cpu.so
-      # libtorch_python.so
-      # libtorch.so
-      "${final.torch}/${sitePackages}/torch/lib"
-    ])
   ];
-
   torchvision = lib.pipe prev.torchvision [
     (ops.addSearchPaths [
-      # libc10.so
-      # libtorch_cpu.so
-      # libtorch_python.so
-      # libtorch.so
       "${final.torch}/${sitePackages}/torch/lib"
     ])
   ];
